@@ -1,0 +1,22 @@
+{
+    "name": "viion/tarkov-api",
+    "description": "PHP Library for interacting with the Tarkov API",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Josh Freeman",
+            "email": "josh@viion.co.uk"
+        }
+    ],
+    "require": {
+        "guzzlehttp/guzzle": "^6.5",
+        "monolog/monolog": "^2.0",
+        "ext-json": "*"
+    },
+    "autoload": {
+        "psr-0": {
+            "TarkovAPI\\": "src/"
+        }
+    }
+}

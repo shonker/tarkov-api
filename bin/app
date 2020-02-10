@@ -1,0 +1,36 @@
+#!/usr/bin/env php
+<?php
+
+// composer auto loader
+require __DIR__ . '/../vendor/autoload.php';
+
+use Monolog\Logger;
+use Monolog\Handler\StreamHandler;
+use TarkovAPI\Tarkov;
+
+// Setup logging
+$log = new Logger('tarkov.bin.app');
+$log->pushHandler(new StreamHandler('php://stdout', Logger::DEBUG));
+
+// Setup API
+$api = new Tarkov();
+
+//
+// ----------------------------------------------------------------------
+//
+
+// Check if launcherVersion is up-to-date
+#$log->info('launcher -> checkLauncherVersion');
+#$api->launcher()->checkLauncherVersion();
+
+
+// Check if gameVersion is up-to-date
+#$log->info('launcher -> checkGameVersion');
+#$api->launcher()->checkGameVersion();
+
+
+// Login (get your credits however you want... file, json, hardcode..., whatever)
+$log->info('launcher -> login');
+
+$creds = json_decode(file_get_contents(__DIR__ .'/creds.json'));
+$api->auth()->login($creds->email, $creds->password);
