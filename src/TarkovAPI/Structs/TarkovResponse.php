@@ -34,7 +34,7 @@ class TarkovResponse
         return $this->errorMessage;
     }
 
-    public function getData(): \stdClass
+    public function getData()
     {
         return $this->data;
     }

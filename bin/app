@@ -28,9 +28,29 @@ $api = new Tarkov();
 #$log->info('launcher -> checkGameVersion');
 #$api->launcher()->checkGameVersion();
 
+// try get previous session
+$session = file_get_contents(__DIR__ .'/session');
 
-// Login (get your credits however you want... file, json, hardcode..., whatever)
-$log->info('launcher -> login');
+// if empty, start a new login
+if (empty($session)) {
+    // Login (get your creds however you want... file, json, hardcode..., whatever)
+    $log->info('launcher -> login');
+    
+    $creds = json_decode(file_get_contents(__DIR__ .'/creds.json'));
+    $login = $api->auth()->login($creds->email, $creds->password);
 
-$creds = json_decode(file_get_contents(__DIR__ .'/creds.json'));
-$api->auth()->login($creds->email, $creds->password);
+    // Exchange token
+    $session = $api->auth()->exchangeAccessToken($login->getData()->access_token);
+
+    // Saving my session token
+    $session = $session->getData()->session;
+    file_put_contents(__DIR__ .'/session', $session);
+}
+
+// Get Profiles
+$profiles = $api->profile()->getProfiles($session);
+
+file_put_contents(
+    __DIR__ .'/data.json',
+    json_encode($profiles->getData(), JSON_PRETTY_PRINT)
+);

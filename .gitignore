@@ -1,3 +1,6 @@
 .idea
 vendor
 creds.json
+bin/session
+bin/data.json
+src/TarkovAPI/Utils/hwid

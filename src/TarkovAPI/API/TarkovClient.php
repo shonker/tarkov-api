@@ -29,6 +29,13 @@ class TarkovClient
         'User-Agent'    => 'BSG Launcher '. Config::LAUNCHER_VERSION,
         'Host'          => Config::LAUNCHER_ENDPOINT
     ];
+    
+    const GAME_HEADERS = [
+        'User-Agent' => 'UnityPlayer/'. Config::UNITY_VERSION .' (UnityWebRequest/1.0, libcurl/7.52.0-DEV)',
+        'App-Version' => 'EFT Client '. Config::GAME_VERSION,
+        'X-Unity-Version' => Config::UNITY_VERSION,
+        'Cookie' => 'PHPSESSID=%s'
+    ];
 
     /** @var Logger */
     private $logger;

@@ -5,6 +5,7 @@ namespace TarkovAPI\API;
 use GuzzleHttp\RequestOptions;
 use TarkovAPI\Config\Config;
 use TarkovAPI\Structs\HTTP;
+use TarkovAPI\Structs\TarkovResponse;
 use TarkovAPI\Utils\HWID;
 
 class TarkovAuth extends TarkovClient
@@ -25,17 +26,17 @@ class TarkovAuth extends TarkovClient
     private $accessToken;
     private $refreshToken;
 
-    public function login(string $email, string $password)
+    public function login(string $email, string $password): TarkovResponse
     {
-        $hwid = (new HWID())->get();
-
         // build login JSON body
-        $body = json_encode([
+        $body = [
             'email'     => $email,
-            'pass'      => bin2hex(md5($password)),
-            'hwCode'    => $hwid,
+            'pass'      => md5($password),
+            'hwCode'    => (new HWID())->get(),
             'captcha'   => null
-        ]);
+        ];
+        
+        print_r($body);
 
         $url = sprintf(
             self::ENDPOINT_LAUNCHER_LOGIN,
@@ -45,18 +46,12 @@ class TarkovAuth extends TarkovClient
         );
 
         // request login
-        $response = $this->request(HTTP::POST, $url, [
+        return $this->request(HTTP::POST, $url, [
             RequestOptions::JSON => $body
         ]);
-
-        print_r([
-            'response' => $response
-        ]);
-
-        die;
     }
 
-    public function exchangeAccessToken($accessToken, $hwid)
+    public function exchangeAccessToken($accessToken)
     {
         $url = sprintf(
             self::ENDPOINT_LAUNCHER_GAME_START,
@@ -66,24 +61,19 @@ class TarkovAuth extends TarkovClient
         );
 
         // request access token
-        $response = $this->request(HTTP::POST, $url, [
+        return $this->request(HTTP::POST, $url, [
             RequestOptions::HEADERS => [
-                'Authorization' => $accessToken
+                'Authorization' => $accessToken,
+                'Host' => Config::PROD_ENDPOINT
             ],
             RequestOptions::JSON => [
                 'version' => [
-                    'major' => Config::GAME_VERSION,
-                    'game' => Config::GAME_BRANCH,
+                    'major'   => Config::GAME_VERSION,
+                    'game'    => Config::GAME_BRANCH,
                     'backend' => Config::GAME_BACKEND_SINGLETON
                 ],
-                'hwCode' => $hwid
+                'hwCode' => (new HWID())->get()
             ]
         ]);
-
-        print_r([
-            'response' => $response
-        ]);
-
-        die;
     }
 }
