@@ -17,13 +17,7 @@ class TarkovLauncher extends TarkovClient
             Config::LAUNCHER_ENDPOINT
         );
 
-        $response = $this->request(HTTP::POST, $url);
-
-        print_r([
-            'response' => $response
-        ]);
-
-        die;
+        return $this->requestWeb(HTTP::POST, $url);
     }
 
     public function checkGameVersion()
@@ -35,12 +29,6 @@ class TarkovLauncher extends TarkovClient
             Config::GAME_BRANCH
         );
 
-        $response = $this->request(HTTP::POST, $url);
-
-        print_r([
-            'response' => $response
-        ]);
-
-        die;
+        return $this->requestWeb(HTTP::POST, $url);
     }
 }

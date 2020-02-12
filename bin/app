@@ -7,6 +7,7 @@ require __DIR__ . '/../vendor/autoload.php';
 use Monolog\Logger;
 use Monolog\Handler\StreamHandler;
 use TarkovAPI\Tarkov;
+use TarkovAPI\Session\TarkovSession;
 
 // Setup logging
 $log = new Logger('tarkov.bin.app');
@@ -28,11 +29,16 @@ $api = new Tarkov();
 #$log->info('launcher -> checkGameVersion');
 #$api->launcher()->checkGameVersion();
 
-// try get previous session
-$session = file_get_contents(__DIR__ .'/session');
+// Initialize our session
+TarkovSession::init();
+
+// attempt to keep session alive
+$alive = $api->auth()->keepAlive();
+$log->info("Alive check");
+print_r($alive);
 
 // if empty, start a new login
-if (empty($session)) {
+if (!TarkovSession::has('session') || $alive->getError()) {
     // Login (get your creds however you want... file, json, hardcode..., whatever)
     $log->info('launcher -> login');
     
@@ -43,14 +49,43 @@ if (empty($session)) {
     $session = $api->auth()->exchangeAccessToken($login->getData()->access_token);
 
     // Saving my session token
-    $session = $session->getData()->session;
-    file_put_contents(__DIR__ .'/session', $session);
+    TarkovSession::store('session', $session->getData()->session);
+    
+    // wipe character login
+    TarkovSession::delete('player');
 }
 
-// Get Profiles
-$profiles = $api->profile()->getProfiles($session);
+$log->info("Tarkov account logged in");
 
-file_put_contents(
-    __DIR__ .'/data.json',
-    json_encode($profiles->getData(), JSON_PRETTY_PRINT)
-);
+// attempt to select player
+if (!TarkovSession::has('player')) {
+    // Get Profiles
+    $profiles = $api->profile()->getProfiles();
+    file_put_contents(__DIR__.'/../data/profiles.json', $profiles);
+    
+    foreach ($profiles->getData() as $profile) {
+        $userId = $profile->_id;
+        $name   = $profile->Info->Nickname;
+        $log->info("ID: {$userId} - Name {$name}");
+    }
+
+    // select player 2
+    $player2 = $profiles->getData()[1];
+    TarkovSession::store('player', $player2->_id);
+    $log->info("Player 2 selected: {$player2->Info->Nickname}");
+    
+    // login to player 2
+    $login = $api->profile()->selectProfile($player2->_id);
+    $log->info("Logged into player 2");
+    print_r($login);
+}
+
+sleep(3);
+
+// get market results
+$results = $api->market()->search([
+    'handbookId' => '57347ca924597744596b4e71',
+]);
+file_put_contents(__DIR__.'/../data/results.json', $results);
+print_r($results);
+

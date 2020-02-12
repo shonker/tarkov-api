@@ -12,19 +12,7 @@ class TarkovAuth extends TarkovClient
 {
     const ENDPOINT_LAUNCHER_LOGIN = 'https://%s/launcher/login?launcherVersion=%s&branch=%s';
     const ENDPOINT_LAUNCHER_GAME_START = 'https://%s/launcher/game/start?launcherVersion=%s&branch=%s';
-
-    private $aid;
-    private $lang;
-    private $region;
-    private $gameVersion;
-    private $dataCenters;
-    private $ipRegion;
-
-    // token vars
-    private $tokenType;
-    private $expiresIn;
-    private $accessToken;
-    private $refreshToken;
+    const ENDPOINT_KEEP_ALIVE = 'https://%s/client/game/keepalive';
 
     public function login(string $email, string $password): TarkovResponse
     {
@@ -46,7 +34,7 @@ class TarkovAuth extends TarkovClient
         );
 
         // request login
-        return $this->request(HTTP::POST, $url, [
+        return $this->requestWeb(HTTP::POST, $url, [
             RequestOptions::JSON => $body
         ]);
     }
@@ -61,7 +49,7 @@ class TarkovAuth extends TarkovClient
         );
 
         // request access token
-        return $this->request(HTTP::POST, $url, [
+        return $this->requestWeb(HTTP::POST, $url, [
             RequestOptions::HEADERS => [
                 'Authorization' => $accessToken,
                 'Host' => Config::PROD_ENDPOINT
@@ -75,5 +63,15 @@ class TarkovAuth extends TarkovClient
                 'hwCode' => (new HWID())->get()
             ]
         ]);
+    }
+    
+    public function keepAlive()
+    {
+        $url = sprintf(
+            self::ENDPOINT_KEEP_ALIVE,
+            Config::PROD_ENDPOINT
+        );
+        
+        return $this->requestGame(HTTP::POST, $url);
     }
 }

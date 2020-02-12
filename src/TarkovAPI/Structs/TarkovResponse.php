@@ -38,4 +38,9 @@ class TarkovResponse
     {
         return $this->data;
     }
+    
+    public function __toString()
+    {
+        return json_encode($this->data, JSON_PRETTY_PRINT);
+    }
 }

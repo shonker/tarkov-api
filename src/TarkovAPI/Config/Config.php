@@ -8,7 +8,7 @@ namespace TarkovAPI\Config;
 class Config
 {
     // should be auto updated
-    const GAME_VERSION = '0.12.3.5776';
+    const GAME_VERSION = '0.12.3.5834';
 
     // game branch
     const GAME_BRANCH = 'live';

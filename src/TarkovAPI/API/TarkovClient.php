@@ -6,6 +6,8 @@ use GuzzleHttp\Client;
 use GuzzleHttp\RequestOptions;
 use Psr\Http\Message\ResponseInterface;
 use TarkovAPI\Config\Config;
+use TarkovAPI\Session\TarkovSession;
+use TarkovAPI\Structs\HTTP;
 use TarkovAPI\Structs\TarkovResponse;
 use TarkovAPI\Utils\Logger;
 
@@ -30,6 +32,7 @@ class TarkovClient
         'Host'          => Config::LAUNCHER_ENDPOINT
     ];
     
+    // game specific headers
     const GAME_HEADERS = [
         'User-Agent' => 'UnityPlayer/'. Config::UNITY_VERSION .' (UnityWebRequest/1.0, libcurl/7.52.0-DEV)',
         'App-Version' => 'EFT Client '. Config::GAME_VERSION,
@@ -55,17 +58,32 @@ class TarkovClient
     }
 
     /**
-     * Send an API Request
+     * Send an API Request to the Web
      */
-    protected function request(string $method, string $uri, ?array $options = []): TarkovResponse
+    protected function requestWeb(string $method, string $uri, ?array $options = []): TarkovResponse
     {
         $this->logger->log->info("Request: {$uri}");
 
+        // set our cookie if we have one
+        $session = TarkovSession::retrieve('session');
+        if ($session && isset($options[RequestOptions::HEADERS]['Cookie'])) {
+            $options[RequestOptions::HEADERS]['Cookie'] = sprintf($options[RequestOptions::HEADERS]['Cookie'], $session);
+        }
+        
         return $this->response($this->client->request(
             $method,
             $uri,
             $options
         ));
+    }
+    
+    /**
+     * Send an API request to the Game
+     */
+    protected function requestGame(string $method, string $uri, ?array $options = []): TarkovResponse
+    {
+        $options[RequestOptions::HEADERS] = TarkovClient::GAME_HEADERS;
+        return $this->requestWeb($method, $uri, $options);
     }
 
     /**

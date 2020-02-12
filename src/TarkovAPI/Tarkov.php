@@ -3,8 +3,13 @@
 namespace TarkovAPI;
 
 use TarkovAPI\API\TarkovAuth;
+use TarkovAPI\API\TarkovGeneral;
+use TarkovAPI\API\TarkovItems;
 use TarkovAPI\API\TarkovLauncher;
+use TarkovAPI\API\TarkovMap;
+use TarkovAPI\API\TarkovMarket;
 use TarkovAPI\API\TarkovProfile;
+use TarkovAPI\API\TarkovTrading;
 
 class Tarkov
 {
@@ -21,5 +26,30 @@ class Tarkov
     public function profile()
     {
         return (new TarkovProfile());
+    }
+    
+    public function general()
+    {
+        return (new TarkovGeneral());
+    }
+    
+    public function items()
+    {
+        return (new TarkovItems());
+    }
+    
+    public function map()
+    {
+        return (new TarkovMap());
+    }
+    
+    public function trading()
+    {
+        return (new TarkovTrading());
+    }
+    
+    public function market()
+    {
+        return (new TarkovMarket());
     }
 }

@@ -5,7 +5,7 @@ namespace TarkovAPI\Utils;
 class HWID
 {
     // where to save Hardware ID so we don't generate one each time
-    const FILENAME = __DIR__ .'/hwid';
+    const FILENAME = __DIR__ .'/../../../data/hwid';
 
     // da fuck is this?
     const HASH_PATTERN = '#1-%s:%s:%s-%s-%s-%s-%s-%s';
