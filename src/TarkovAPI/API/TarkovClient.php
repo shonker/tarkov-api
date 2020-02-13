@@ -19,7 +19,10 @@ class TarkovClient
         207 => 'Missing Parameters',
         209 => 'Two Factor Required',
         211 => 'Bad Two Factor Code',
-        214 => 'Captcha Required'
+        214 => 'Captcha Required',
+        228 => 'Item no longer being offered',
+        
+        1510 => 'Bad Loyalty Level',
     ];
 
     // client timeout
@@ -62,7 +65,7 @@ class TarkovClient
      */
     protected function requestWeb(string $method, string $uri, ?array $options = []): TarkovResponse
     {
-        $this->logger->log->info("Request: {$uri}");
+        #$this->logger->log->info("Request: {$uri}");
 
         // set our cookie if we have one
         $session = TarkovSession::retrieve('session');

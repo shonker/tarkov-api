@@ -23,8 +23,6 @@ class TarkovAuth extends TarkovClient
             'hwCode'    => (new HWID())->get(),
             'captcha'   => null
         ];
-        
-        print_r($body);
 
         $url = sprintf(
             self::ENDPOINT_LAUNCHER_LOGIN,

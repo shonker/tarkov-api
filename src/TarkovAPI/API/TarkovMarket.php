@@ -11,7 +11,7 @@ use TarkovAPI\Utils\HWID;
 class TarkovMarket extends TarkovClient
 {
     const PAGE = 0; // default page
-    const LIMIT = 25; // default limit
+    const LIMIT = 10; // default limit
     const SORT_ID = 0;
     const SORT_BARTER = 2;
     const SORT_MECHANT_RATING = 3;
@@ -25,9 +25,10 @@ class TarkovMarket extends TarkovClient
     const CURRENCY_EUR = 3;
     const TM = 1; // no idea wtf this is
     
-    const MARKET_TEMPLATE = '5449016a4bdc2d6f028b456f'; // fixed tpl for rubbles?
+    const TPL_ROUBLES = '5449016a4bdc2d6f028b456f'; // fixed tpl for rubbles?
     
     const ENDPOINT_SEARCH = 'https://%s/client/ragfair/find';
+    const ENDPOINT_MARKET = 'https://%s/client/game/profile/items/moving';
     
     /**
      * Search for an item
@@ -62,6 +63,78 @@ class TarkovMarket extends TarkovClient
                 'neededSearchId' => $filters['neededSearchId'] ?? "",
                 'tm' => self::TM,
             ]
+        ]);
+    }
+    
+    public function buy(string $offerId, int $quantity, $barterItem)
+    {
+        $url = sprintf(
+            self::ENDPOINT_MARKET,
+            Config::PROD_ENDPOINT
+        );
+    
+        // buy body
+        $body = [
+            'data' => [
+                [
+                    'Action' => 'RagFairBuyOffer',
+                    'tm' => 2, // ???
+                    'offers' => [
+                        [
+                            'id' => $offerId,
+                            'count' => $quantity,
+                            'items' => [
+                                [
+                                    'id' => $barterItem['id'],
+                                    'count' => $barterItem['count']
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ];
+    
+        return $this->requestGame(HTTP::POST, $url, [
+            RequestOptions::JSON => $body
+        ]);
+    }
+    
+    /**
+     * requirements = [
+     *  'price' => 123000,
+     * ]
+     */
+    public function sell(array $items, int $price, $sellAll = false)
+    {
+        $url = sprintf(
+            self::ENDPOINT_MARKET,
+            Config::PROD_ENDPOINT
+        );
+        
+        // sale body
+        $body = [
+            'data' => [
+                [
+                    'Action' => 'RagFairAddOffer',
+                    'tm' => 2, // ???
+                    'sellInOnePiece' => $sellAll,
+                    'items' => $items,
+                    'requirements' => [
+                        [
+                            '_tpl' => self::TPL_ROUBLES,
+                            'count' => $price,
+                            'level' => 0,
+                            'side' => 0,
+                            'onlyFunctional' => false,
+                        ]
+                    ]
+                ]
+            ]
+        ];
+        
+        return $this->requestGame(HTTP::POST, $url, [
+            RequestOptions::JSON => $body
         ]);
     }
 }

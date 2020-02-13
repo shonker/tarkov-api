@@ -36,4 +36,30 @@ class TarkovProfile extends TarkovClient
             ],
         ]);
     }
+    
+    public function getRoubles($profile)
+    {
+        if (empty($profile->Inventory->items)) {
+            throw new \Exception("Invalid profile inventory, it's empty??");
+        }
+        
+        $total = 0;
+        $stacks = [];
+        
+        foreach ($profile->Inventory->items as $item) {
+            if ($item->_tpl === TarkovMarket::TPL_ROUBLES) {
+                $total += $item->upd->StackObjectsCount;
+                $stacks[] = [
+                    'id' => $item->_id,
+                    'amount' => $item->upd->StackObjectsCount
+                ];
+            }
+        }
+        
+        return [
+            'total' => $total,
+            'total_str' => number_format($total),
+            'stacks' => $stacks,
+        ];
+    }
 }

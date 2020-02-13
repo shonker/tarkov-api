@@ -5,3 +5,5 @@ bin/session
 bin/data.json
 src/TarkovAPI/Utils/hwid
 data
+*.log
+bin/bot.php
