@@ -12,6 +12,7 @@ class TarkovProfile extends TarkovClient
 {
     const ENDPOINT_PROFILE_LIST = 'https://%s/client/game/profile/list';
     const ENDPOINT_PROFILE_SELECT = 'https://%s/client/game/profile/select';
+    const ENDPOINT_PROFILE_MOVING = 'https://%s/client/game/profile/items/moving';
 
     public function getProfiles(): TarkovResponse
     {
@@ -37,6 +38,32 @@ class TarkovProfile extends TarkovClient
         ]);
     }
     
+    /**
+     * Stack items, eg 2 stacks of roubles.
+     */
+    public function stackItem($fromId, $toId)
+    {
+        $url = sprintf(
+            self::ENDPOINT_PROFILE_MOVING,
+            Config::PROD_ENDPOINT
+        );
+        
+        $body = [
+            'tm' => 2,
+            'data' => [
+                [
+                    'Action' => 'Merge',
+                    'item' => $fromId,
+                    'with' => $toId,
+                ]
+            ]
+        ];
+    
+        return $this->requestGame(HTTP::POST, $url, [
+            RequestOptions::JSON => $body,
+        ]);
+    }
+    
     public function getRoubles($profile)
     {
         if (empty($profile->Inventory->items)) {
@@ -45,6 +72,8 @@ class TarkovProfile extends TarkovClient
         
         $total = 0;
         $stacks = [];
+        $biggestStack = 0;
+        $biggestStackId = null;
         
         foreach ($profile->Inventory->items as $item) {
             if ($item->_tpl === TarkovMarket::TPL_ROUBLES) {
@@ -53,6 +82,11 @@ class TarkovProfile extends TarkovClient
                     'id' => $item->_id,
                     'amount' => $item->upd->StackObjectsCount
                 ];
+                
+                if ($biggestStack < $item->upd->StackObjectsCount) {
+                    $biggestStack = $item->upd->StackObjectsCount;
+                    $biggestStackId = $item->_id;
+                }
             }
         }
         
@@ -60,6 +94,8 @@ class TarkovProfile extends TarkovClient
             'total' => $total,
             'total_str' => number_format($total),
             'stacks' => $stacks,
+            'stack_big_total' => $biggestStack,
+            'stack_big_id' => $biggestStackId,
         ];
     }
 }
