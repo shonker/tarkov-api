@@ -33,9 +33,4 @@ class TarkovTrading extends TarkovClient
     
         return $this->requestGame(HTTP::POST, $url);
     }
-    
-    public function getI18N(string $language)
-    {
-    
-    }
 }
