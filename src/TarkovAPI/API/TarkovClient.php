@@ -37,16 +37,21 @@ class TarkovClient
     
     // game specific headers
     const GAME_HEADERS = [
+        'Content-Type' => 'application/json',
+        'Accept' => 'application/json',
         'User-Agent' => 'UnityPlayer/'. Config::UNITY_VERSION .' (UnityWebRequest/1.0, libcurl/7.52.0-DEV)',
         'App-Version' => 'EFT Client '. Config::GAME_VERSION,
         'X-Unity-Version' => Config::UNITY_VERSION,
-        'Cookie' => 'PHPSESSID=%s'
+        'Cookie' => 'PHPSESSID=%s',
+        'GClient-RequestId' => 0
     ];
 
     /** @var Logger */
     private $logger;
     /** @var Client */
     private $client;
+    /** @var int */
+    private $requestCount = 0;
 
     public function __construct()
     {
@@ -65,12 +70,18 @@ class TarkovClient
      */
     protected function requestWeb(string $method, string $uri, ?array $options = []): TarkovResponse
     {
+        $this->requestCount++;
+        
         #$this->logger->log->info("Request: {$uri}");
 
         // set our cookie if we have one
         $session = TarkovSession::retrieve('session');
         if ($session && isset($options[RequestOptions::HEADERS]['Cookie'])) {
             $options[RequestOptions::HEADERS]['Cookie'] = sprintf($options[RequestOptions::HEADERS]['Cookie'], $session);
+        }
+        
+        if (isset($options['GClient-RequestId'])) {
+            $options['GClient-RequestId'] = $this->requestCount;
         }
         
         return $this->response($this->client->request(
