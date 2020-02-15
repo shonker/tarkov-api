@@ -6,6 +6,7 @@ use TarkovAPI\API\TarkovAuth;
 use TarkovAPI\API\TarkovGeneral;
 use TarkovAPI\API\TarkovItems;
 use TarkovAPI\API\TarkovLauncher;
+use TarkovAPI\API\TarkovMail;
 use TarkovAPI\API\TarkovMap;
 use TarkovAPI\API\TarkovMarket;
 use TarkovAPI\API\TarkovProfile;
@@ -51,5 +52,10 @@ class Tarkov
     public function market()
     {
         return (new TarkovMarket());
+    }
+    
+    public function mail()
+    {
+        return (new TarkovMail());
     }
 }
