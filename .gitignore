@@ -1,9 +1,14 @@
 .idea
 vendor
 creds.json
-bin/session
-bin/data.json
+login.json
+bot/session
+bot/data.json
 src/TarkovAPI/Utils/hwid
 data
 *.log
 bin/bot.php
+bot/login.php
+bot/bot.php
+bot/bot_settings.php
+bot/bot_shopping_list.php

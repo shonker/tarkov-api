@@ -25,6 +25,11 @@ class HWID
 
         return trim(file_get_contents(self::FILENAME));
     }
+    
+    public function set(string $hwid)
+    {
+        file_put_contents(self::FILENAME, $hwid);
+    }
 
     public function reset()
     {

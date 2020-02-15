@@ -1,11 +1,10 @@
-#!/usr/bin/env php
 <?php
 
 // composer auto loader
-require __DIR__ . '/../vendor/autoload.php';
+require __DIR__ . '/vendor/autoload.php';
 
-if (!is_dir(__DIR__.'/../data')) {
-    mkdir(__DIR__ .'/../data');
+if (!is_dir(__DIR__ . '/../data')) {
+    mkdir(__DIR__ . '/../data');
 }
 
 use Monolog\Logger;
@@ -47,7 +46,7 @@ if (!TarkovSession::has('session') || $alive->getError()) {
     // Login (get your creds however you want... file, json, hardcode..., whatever)
     $log->info('launcher -> login');
     
-    $creds = json_decode(file_get_contents(__DIR__ .'/creds.json'));
+    $creds = require_once __DIR__.'/bot/login.php';
     $login = $api->auth()->login($creds->email, $creds->password);
 
     // Exchange token
@@ -66,7 +65,7 @@ $log->info("Tarkov account logged in");
 if (!TarkovSession::has('player')) {
     // Get Profiles
     $profiles = $api->profile()->getProfiles();
-    file_put_contents(__DIR__.'/../data/profiles.json', json_encode($profiles->getData(), JSON_PRETTY_PRINT));
+    file_put_contents(__DIR__ . '/../data/profiles.json', json_encode($profiles->getData(), JSON_PRETTY_PRINT));
     
     foreach ($profiles->getData() as $profile) {
         $userId = $profile->_id;
@@ -80,7 +79,7 @@ if (!TarkovSession::has('player')) {
     $log->info("Player 2 selected: {$player2->Info->Nickname}");
     
     // save player
-    file_put_contents(__DIR__.'/../data/player.json', json_encode($player2, JSON_PRETTY_PRINT));
+    file_put_contents(__DIR__ . '/../data/player.json', json_encode($player2, JSON_PRETTY_PRINT));
     
     // login to player 2
     $login = $api->profile()->selectProfile($player2->_id);
@@ -88,7 +87,7 @@ if (!TarkovSession::has('player')) {
     print_r($login);
 }
 
-$player = json_decode(file_get_contents(__DIR__ .'/../data/player.json'));
+$player = json_decode(file_get_contents(__DIR__ . '/../data/player.json'));
 print_r($player->Info);
 
 // get all roubles
@@ -108,7 +107,7 @@ $listings = $api->market()->search([
     'handbookId' => $itemId
 ]);
 
-file_put_contents(__DIR__.'/../data/listings.json', json_encode($listings->getData(), JSON_PRETTY_PRINT));
+file_put_contents(__DIR__ . '/../data/listings.json', json_encode($listings->getData(), JSON_PRETTY_PRINT));
 
 die;
 

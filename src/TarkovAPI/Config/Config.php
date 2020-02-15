@@ -17,7 +17,7 @@ class Config
     const GAME_BACKEND_SINGLETON = 6;
 
     // should be auto updated
-    const LAUNCHER_VERSION = '0.9.3.1011';
+    const LAUNCHER_VERSION = '0.9.3.1023';
 
     // this need to be empty it will updated by script
     const UNITY_VERSION = '2018.4.13f1';
