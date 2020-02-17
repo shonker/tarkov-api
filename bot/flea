@@ -50,13 +50,15 @@ if ($itemId === 'mine') {
         $results = $api->market()->search([ 'handbookId' => $id ], 0, 5);
         printOfferResults($results->getData()->offers);
     }
+    
+    return;
 }
 
 //
 // General flea market list
 //
 
-$item = $items->{$itemId} ?? null;
+$item = $itemdata->{$itemId} ?? null;
 
 if ($item === null) {
     die("Cannot find item for id: {$itemId} -- make sure you copied it correctly.");

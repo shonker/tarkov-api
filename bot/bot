@@ -285,26 +285,6 @@ try {
         }
         console("---------------------------------------");
     }
-    
-    function printItemsNotSelling() {
-        global $itemsNotSold, $itemdata;
-        
-        if (empty($itemsNotSold)) {
-            return;
-        }
-        
-        foreach ($itemsNotSold as $itemId => $time) {
-            $deadline = time() - (60 * 15);
-            $item = $itemdata->{$itemId};
-            
-            if ($time < $deadline) {
-                console("<error>INVENTORY ITEM</error>: ({$itemId}) {$item->name} has not been put up for sale due to current cheapest being too low.");
-                
-                // reset time
-                $itemdata[$itemId] = time();
-            }
-        }
-    }
 } catch (\Exception $ex) {
     sleepbot($ex);
     goto botStart;
@@ -414,7 +394,7 @@ try {
         
         // Report iteration
         $iterationCount++;
-        console("<fg=magenta>{$iterationCount}</> \t Roubles: <fg=magenta>". number_format($roubles['total']) ."</> | Spent: <fg=magenta>". number_format($maxRoubleSpentCurrent) ."</> | Est.Profit: <fg=magenta>{$currentEstProfit}</> | Offers: <fg=magenta>{$offers}</> | Inventory: <fg=magenta>{$inventorySize}</> | Buy: <fg=magenta>{$purchaseCount}</> / Sell: <fg=magenta>{$salesCount}</>");
+        console("<fg=magenta>{$iterationCount}</> \t Roubles: <fg=magenta>". number_format($roubles['total']) ."</> | Spent: <fg=magenta>". number_format($maxRoubleSpentCurrent) ."</> | Est.Profit: <fg=magenta>{$currentEstProfit}</> | Offers: <fg=magenta>{$offers}/{$totalOffersPossible}</> | Inventory: <fg=magenta>{$inventorySize}</> | Buy: <fg=magenta>{$purchaseCount}</> / Sell: <fg=magenta>{$salesCount}</>");
         
         // get money from stash every so often
         if ($iterationCount % $collectEveryIteration === 0) {
@@ -435,7 +415,6 @@ try {
         }
 
         if ($iterationCount % $printOfferIterations === 0) {
-            printItemsNotSelling();
             printOffers();
         }
         
@@ -469,8 +448,8 @@ try {
                 
                 if (!in_array($offerItemId, $itemsIgnored)) {
                     // we will buy a max of 5
-                    if ($offerQuantity > 20) {
-                        $offerQuantity = 20;
+                    if ($offerQuantity > $maxPurchaseAmount) {
+                        $offerQuantity = $maxPurchaseAmount;
                     }
                     
                     // if offer cost is less than our limit, buy it!!!
