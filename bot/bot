@@ -1,0 +1,616 @@
+#!/usr/bin/env php
+<?php
+
+require_once __DIR__ . '/../vendor/autoload.php';
+
+use TarkovAPI\Session\TarkovSession;
+use TarkovAPI\Config\Config;
+use TarkovAPI\Tarkov;
+use TarkovAPI\Utils\HWID;
+use Symfony\Component\Console\Helper\Table;
+
+require_once __DIR__ . '/bot_core.php';
+
+if (!is_dir(__DIR__ . '/../data')) {
+    mkdir(__DIR__ . '/../data');
+}
+
+// download item list
+$itemfilename = __DIR__ .'/../data/items.json';
+if (!file_exists($itemfilename)) {
+    file_put_contents($itemfilename, file_get_contents('https://pastebin.com/raw/D4pSKvA6'));
+}
+$itemdata = file_get_contents($itemfilename);
+$itemdata = json_decode($itemdata);
+
+// items to buy and sell
+$items = require_once __DIR__ . '/bot_shopping_list.php';
+
+// Get login credentials
+$login = require_once __DIR__ . '/login.php';
+
+require_once __DIR__ . '/bot_settings.php';
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+// Bot internal vars
+$iterationCount         = 0;
+$expectedProfit         = 0;
+$errorCurrent           = 0;
+$itemsIgnored           = [];
+$listedItemIds          = [];
+$delayLoop1             = 100000;
+$delayLoop2             = 30000;
+$loopsWithOffers        = 0;
+$maxRoubleSpentCurrent  = 0;
+$snipeFilename          = __DIR__ .'/snipes.txt';
+$totalOffersPossible    = 3;
+$purchaseCount          = 0;
+$salesCount             = 0;
+$offerDeadline          = (60 * $offerStuckDeadline);
+$itemIdsToNames         = [];
+$itemsNotSold           = [];
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+
+// Setup API
+$api = new Tarkov();
+$player = null;
+$playerLastFetched = 0;
+
+//
+// Check our Game and Launcher version is up to date
+//
+console("CHECKING GAME / LAUNCHER VERSION");
+$verGame = $api->launcher()->checkGameVersion()->getData()[0];
+$verLauncher = $api->launcher()->checkLauncherVersion()->getData();
+if ($verGame->Version != Config::GAME_VERSION) {
+    error("Error: GAME version in config file is out of date. Update it!");
+}
+if ($verLauncher->Version != Config::LAUNCHER_VERSION) {
+    error("Error: LAUNCHER version in config file is out of date. Update it!");
+}
+
+//
+// Start botting
+//
+
+// reset logs and snipe file
+logReset();
+
+// Initialize our session
+TarkovSession::init();
+
+// Initialize our HWID
+(new HWID())->set($login['hwid']);
+
+try {
+    function login()
+    {
+        global $api, $login;
+        
+        console("Logging into EFT");
+        $loginResponse   = $api->auth()->login($login['user'], $login['pass']);
+        $sessionResponse = $api->auth()->exchangeAccessToken($loginResponse->getData()->access_token);
+        TarkovSession::store('session', $sessionResponse->getData()->session);
+        TarkovSession::delete('player');
+    }
+    
+    function getMainPlayer()
+    {
+        global $api, $player, $playerLastFetched;
+        
+        // if player info was fetched recently don't do anything
+        if ($playerLastFetched > time() - 10) {
+            return $player;
+        }
+    
+        $playerLastFetched  = time();
+        
+        // select find our player if we need to
+        $profiles = $api->profile()->getProfiles();
+        $player = $profiles->getData()[1];
+        file_put_contents(__DIR__ . '/../data/player.json', json_encode($player, JSON_PRETTY_PRINT));
+        
+        // ensure player is selected
+        $api->profile()->selectProfile($player->_id);
+        TarkovSession::store('player', $player->_id);
+        return $player;
+    }
+    
+    function getOfferCount()
+    {
+        return count(getMainPlayer()->RagfairInfo->offers);
+    }
+    
+    function getCurrentRoublesCount()
+    {
+        global $api, $player;
+        
+        // get player roubles
+        $player = getMainPlayer();
+        $currentRoubles = $api->profile()->getRoubles($player);
+        
+        return $currentRoubles;
+    }
+    
+    function keepAlive()
+    {
+        global $api;
+        
+        $alive = $api->auth()->keepAlive();
+        
+        // if not logged in, refresh
+        if (!TarkovSession::has('session') || $alive->getError()) {
+            login();
+        }
+    }
+    
+    function getMoneyFromMarket()
+    {
+        global $api, $player;
+        
+        // get our mail from the market
+        $mail = $api->mail()->getMailFromMarket();
+        
+        // get all attachments from market mail
+        $attachments = $api->mail()->getMailAttachments($mail->_id);
+        
+        if (count($attachments->getData()->messages) == 0) {
+            return;
+        }
+        
+        // loop through
+        $moneyMoved = 0;
+        $moneyMovedCount = 0;
+    
+        console("MONEY TRANSFER: Starting...");
+        foreach ($attachments->getData()->messages as $attachment) {
+            $merge = $api->mail()->getMoneyFromFleaMarket(
+                $player->Inventory->stash,
+                $attachment->_id,
+                $attachment->items->data[0]->_id
+            );
+            
+            // if error from merging
+            if ($merge->getError()) {
+                break;
+            }
+            
+            $moneyMoved += $attachment->items->data[0]->upd->StackObjectsCount;
+            $moneyMovedCount++;
+        }
+        
+        console("MONEY TRANSFER: {$moneyMovedCount} stacks for a total of: ". number_format($moneyMoved));
+    }
+    
+    function mergeRoublesStacks() {
+        global $api, $roubles, $roubleStackMinimum, $maxRoubleStacking;
+        
+        // merge stacks
+        $previousStackId = null;
+        $stackCounter = 0;
+
+        // sort by high to low
+        usort($roubles['stacks'], function ($a, $b) {
+            return $a['amount'] <=> $b['amount'];
+        });
+
+        foreach ($roubles['stacks'] as $roubleStack) {
+            if ($stackCounter > $maxRoubleStacking) {
+                break;
+            }
+            
+            // Skip stacks that are 500k, can't be merged
+            if ($roubleStack['amount'] == 500000) {
+                continue;
+            }
+            
+            // set the previous stack id and continue
+            if ($previousStackId === null) {
+                $previousStackId = $roubleStack['id'];
+                continue;
+            }
+        
+            // if we're below stack minimum, try merge
+            if ($roubleStack['amount'] < $roubleStackMinimum) {
+                // try merge with the previous
+                $api->profile()->stackItem($previousStackId, $roubleStack['id']);
+                $stackCounter++;
+                
+                // reset previous stack id
+                $previousStackId = null;
+            }
+        }
+    }
+    
+    function sleepbot(\Exception $ex) {
+        global $sleepMinuteMin, $sleepMinuteMax;
+        
+        $sleep = mt_rand($sleepMinuteMin, $sleepMinuteMax);
+        sleep(60 * $sleep);
+        console("Exception throw: {$ex->getMessage()} - Sleeping for: {$sleep} minutes...");
+    }
+    
+    function checkOffersCurrentlyActive() {
+        global $player, $offerDeadline, $itemdata;
+
+        // deadline of the item
+        $deadline = time() - $offerDeadline;
+        
+        // loop through offers
+        foreach ($player->RagfairInfo->offers as $currentOffer) {
+            $itemId    = $currentOffer->items[0]->_tpl;
+            $item      = $itemdata->{$itemId} ?? '(Unknown Item, not in your shopping list)';
+            $price     = number_format($currentOffer->requirements[0]->count);
+            $startTime = date('Y-m-d H:i:s', $currentOffer->startTime);
+            $quantity  = $currentOffer->items[0]->upd->StackObjectsCount;
+            
+            if ($currentOffer->startTime < $deadline) {
+                $cheapest = number_format(getCheapestPriceForItem($itemId));
+                
+                console("------------- ITEM NOT SELLING -------------");
+                console("!! STUCK ITEM: {$quantity} x {$item->name} for: {$price} (Cheapest: {$cheapest}) - Date Posted: ". $startTime);
+                console("------------- ITEM NOT SELLING -------------");
+            }
+        }
+    }
+    
+    function getCheapestPriceForItem($itemId) {
+        global $api;
+        $result = $api->market()->search([ 'handbookId' => $itemId ], 0, 1);
+        return $result->getData()->offers[0]->requirementsCost;
+    }
+    
+    function printOffers() {
+        global $api, $player, $itemdata;
+        
+        if (empty($player->RagfairInfo->offers)) {
+            return;
+        }
+    
+        console("---------------------------------------");
+        console("CURRENT OFFERS");
+        
+        foreach ($player->RagfairInfo->offers as $i => $currentOffer) {
+            $i         = $i + 1;
+            $itemId    = $currentOffer->items[0]->_tpl;
+            $item      = $itemdata->{$itemId} ?? '(Unknown Item, not in your shopping list)';
+            $price     = number_format($currentOffer->requirements[0]->count);
+            $startTime = date('Y-m-d H:i:s', $currentOffer->startTime);
+            $quantity  = $currentOffer->items[0]->upd->StackObjectsCount;
+            $cheapest  = number_format(getCheapestPriceForItem($itemId));
+            
+            console("  {$i}: {$quantity} x {$item->name} at {$price} (Cheapest: {$cheapest}) - Posted: {$startTime}");
+        }
+        console("---------------------------------------");
+    }
+    
+    function printItemsNotSelling() {
+        global $itemsNotSold, $itemdata;
+        
+        if (empty($itemsNotSold)) {
+            return;
+        }
+        
+        foreach ($itemsNotSold as $itemId => $time) {
+            $deadline = time() - (60 * 15);
+            $item = $itemdata->{$itemId};
+            
+            if ($time < $deadline) {
+                console("<error>INVENTORY ITEM</error>: ({$itemId}) {$item->name} has not been put up for sale due to current cheapest being too low.");
+                
+                // reset time
+                $itemdata[$itemId] = time();
+            }
+        }
+    }
+} catch (\Exception $ex) {
+    sleepbot($ex);
+    goto botStart;
+}
+
+// a lovely go to lol
+botStart:
+
+/**
+ * Fancy ass title
+ */
+console('<info>--------------------------------------------------------------------------------</info>');
+console('<info>Escape From Tarkov Market Bot</info>');
+console('<info>By: the AMAZING Vekien</info>');
+console('<info>Starting Bot....</info>');
+console('<info>--------------------------------------------------------------------------------</info>');
+
+// Login
+login();
+
+// Set player
+$player = getMainPlayer();
+
+// Set max offer
+foreach ($maximumOffers as $rating => $offerSlots) {
+    if ($player->RagfairInfo->rating > $rating) {
+        $totalOffersPossible = $offerSlots;
+    }
+}
+
+// get main player
+$roubles = getCurrentRoublesCount();
+$roublesTotal         = $roubles['total'];
+$roublesStackId       = $roubles['stack_big_id'];
+$roublesStackAmount   = $roubles['stack_big_total'];
+$inventorySize        = count(getMainPlayer()->Inventory->items);
+console("Roubles: <comment>". number_format($roublesTotal) ."</comment>");
+console("Rouble Stack: <comment>{$roublesStackId} = {$roublesStackAmount}</comment>");
+console("Inventory Count = <comment>{$inventorySize}</comment>");
+console("Max Offers = <comment>{$totalOffersPossible}</comment>");
+console("<info>--------------------------------------------------------------------------------</info>");
+$consoleOutput->writeln("");
+$consoleOutput->writeln("SHOPPING LIST");
+
+// Print shopping list
+$table     = new Table($consoleOutput);
+$tableRows = [];
+foreach ($items as $i => $item) {
+    $i = $i+1;
+    
+    $itemId    = $item['id'];
+    $buyPrice  = $item['buy'];
+    $sellPrice = $item['sell'];
+    $item      = $itemdata->{$itemId};
+    
+    $tableRows[] = [
+        $i,
+        $itemId,
+        "<comment>{$item->name}</comment>",
+        "<fg=yellow>". number_format($buyPrice) ."</>",
+        "<fg=yellow>". ($sellPrice ? number_format($sellPrice) : '-') .'</>'
+    ];
+
+    // don't mind non sellable
+    if ($sellPrice === 0) {
+        continue;
+    }
+    
+    if ($sellPrice < $buyPrice) {
+        error("The sell price is below the buy price for the above item");
+    }
+}
+
+$table->setHeaders(['#', 'ID', 'Name', 'BUY', 'SELL'])->setRows($tableRows);
+$table->render();
+$consoleOutput->writeln("");
+
+console("<info>--------------------------------------------------------------------------------</info>");
+
+try {
+    while(true) {
+        $roubles            = getCurrentRoublesCount();
+        $roublesTotal       = $roubles['total'];
+        $roublesStackId     = $roubles['stack_big_id'];
+        $roublesStackAmount = $roubles['stack_big_total'];
+        $currentEstProfit   = number_format($expectedProfit) .' ('. number_format($expectedProfit + $maxRoubleSpentCurrent) .')';
+        
+        if ($roublesTotal < $minRoublesToReduceTo) {
+            console("You've ran out of most of your money");
+            die;
+        }
+        
+        $inventorySize = count($player->Inventory->items);
+        
+        // check offers
+        $offers = getOfferCount();
+        
+        if ($offers > 0) {
+            $loopsWithOffers++;
+        }
+        
+        // die if the max for sale is 3 and it's been like that for some time
+        if ($offers == $totalOffersPossible && $loopsWithOffers > $loopsWithOffersMax) {
+            console('The maximum number of loops has reached with max offers, good chance your shit isnt selling');
+            die;
+        }
+        
+        // Report iteration
+        $iterationCount++;
+        console("<fg=magenta>{$iterationCount}</> \t Roubles: <fg=magenta>". number_format($roubles['total']) ."</> | Spent: <fg=magenta>". number_format($maxRoubleSpentCurrent) ."</> | Est.Profit: <fg=magenta>{$currentEstProfit}</> | Offers: <fg=magenta>{$offers}</> | Inventory: <fg=magenta>{$inventorySize}</> | Buy: <fg=magenta>{$purchaseCount}</> / Sell: <fg=magenta>{$salesCount}</>");
+        
+        // get money from stash every so often
+        if ($iterationCount % $collectEveryIteration === 0) {
+            checkOffersCurrentlyActive();
+            getMoneyFromMarket();
+            
+            // stack money
+            console("MERGING ROUBLE STACKS");
+            foreach (range(0, $roubleStackLoops) as $stackLoop) {
+                mergeRoublesStacks();
+            }
+        }
+        
+        // error check
+        if ($errorCurrent > $errorMax) {
+            console('Max error/rouble count reached, ending');
+            die();
+        }
+
+        if ($iterationCount % $printOfferIterations === 0) {
+            printItemsNotSelling();
+            printOffers();
+        }
+        
+        // BUY --- Scan market and buy shit!
+        foreach ($items as $i => $item) {
+            $name      = $item['name'];
+            $itemId    = $item['id'];
+            $buyPrice  = $item['buy'];
+            $sellPrice = $item['sell'];
+            $amount    = $item['amount'];
+            $undercut  = $item['undercut'] ?? null;
+            
+            // if buy price is 0, skip it
+            if ($buyPrice == 0) {
+                continue;
+            }
+            
+            // search
+            $listings = $api->market()->search([ 'handbookId' => $itemId ], 0, $itemsPerPage );
+            
+            // get cheapest
+            $cheapest = $listings->getData()->offers[0]->requirementsCost;
+            //console("Cheapest {$name} = {$cheapest} / {$buyPrice}");
+            
+            // Make sure we don't go over max inventory until shit sells
+            // loop over all offers
+            foreach ($listings->getData()->offers as $offer) {
+                $offerItemId   = $offer->_id;
+                $offerQuantity = $offer->items[0]->upd->StackObjectsCount;
+                $offerCost     = $offer->requirementsCost;
+                
+                if (!in_array($offerItemId, $itemsIgnored)) {
+                    // we will buy a max of 5
+                    if ($offerQuantity > 20) {
+                        $offerQuantity = 20;
+                    }
+                    
+                    // if offer cost is less than our limit, buy it!!!
+                    if ($offerCost <= $buyPrice) {
+                        $buy = $api->market()->buy($offerItemId, $offerQuantity, [
+                            'id' => $roublesStackId,
+                            'count' => $offerCost,
+                            'conditionFrom' => 100,
+                        ]);
+                        
+                        if ($buy->getError()) {
+                            $errorCurrent++;
+                            $itemsIgnored[] = $offerItemId;
+                        } else {
+                            $purchase = $buy->getData();
+                            
+                            // make sure we got the item
+                            if (!empty($purchase->items->new)) {
+                                $purchaseCount++;
+                                
+                                $totalCost             = $offerQuantity * $offer->requirementsCost;
+                                $expectedProfit        -= $totalCost;
+                                $maxRoubleSpentCurrent += $totalCost;
+                                $actualPrice           = $listings->getData()->offers[$sellCompareIndex]->requirementsCost;
+                                
+                                console("<fg=cyan><< [BUY]  {$offerQuantity} x {$name} for: ". number_format($totalCost) ." (Compare: ". number_format($actualPrice) .")</>");
+                                
+                                if ($offer->requirementsCost < $actualPrice && $offer->requirementsCost / $actualPrice < 0.25) {
+                                    $boughtFor    = number_format($offer->requirementsCost);
+                                    $discount     = 100 - round(($offer->requirementsCost / $actualPrice) * 100, 2);
+                                    $snipeMessage = "SNIPED: {$name} for {$boughtFor} - Compared sale: {$actualPrice} (Discount: {$discount}%)";
+                                    
+                                    snipe($snipeMessage);
+                                    console([
+                                        "<fg=yellow>--------------------------------------------------------------------------------</>",
+                                        "<fg=yellow>{$snipeMessage}</>",
+                                        "<fg=yellow>--------------------------------------------------------------------------------</>"
+                                    ]);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            usleep($delayLoop2);
+        }
+        
+        // if we have 3 offers, skip, can't do shit!
+        if ($offers >= $totalOffersPossible) {
+            usleep($delayLoop1);
+            continue;
+        }
+    
+        // get player
+        $player = getMainPlayer();
+        
+        // SELL --- Scan our inventory and sell shit!
+        foreach ($items as $i => $item) {
+            $name      = $item['name'];
+            $itemId    = $item['id'];
+            $buyPrice  = $item['buy'];
+            $sellPrice = $item['sell'];
+            $amount    = $item['amount'];
+            $undercut  = $item['undercut'] ?? null;
+            
+            // break if we hit the offer max
+            if ($offers >= $totalOffersPossible) {
+                break;
+            }
+            
+            // ignore selling if amount is 0 or sell is 0
+            if ($sellPrice == 0 || $amount == 0) {
+                continue;
+            }
+            
+            // find items in our inventory until we have the correct amount
+            $itemIdsToSell = [];
+            foreach ($player->Inventory->items as $invItem) {
+                if ($itemId == $invItem->_tpl && !in_array($invItem->_id, $listedItemIds)) {
+                    $itemIdsToSell[] = $invItem->_id;
+                }
+            }
+            
+            // get total quantity to sell
+            $itemIdsToSellQuantity = count($itemIdsToSell);
+            
+            // if we meet the amount
+            if ($itemIdsToSellQuantity >= $amount) {
+                $undercutting  = false;
+                $cheapest = '(n/a)';
+                
+                // if undercutting, do a cheapest check
+                if ($undercut) {
+                    // before selling double check current cheapest
+                    $cheapest = getCheapestPriceForItem($itemId);
+    
+                    // if the cheapest one up is cheaper than our sell price, don't sell!
+                    if ($cheapest < $sellPrice) {
+                        if (!isset($itemsNotSold[$itemId])) {
+                            $itemsNotSold[$itemId] = time();
+                        }
+                        # console(">> Cheapest {$name} is {$cheapest} which is below minimum sale price: {$sellPrice}");
+                        continue;
+                    }
+    
+                    // Sell for X less than the cheapest
+                    $undercutPrice = $cheapest - $undercut;
+    
+                    // if the new undercut price is cheaper than our sell price, adjust sell price
+                    if ($sellPrice < $undercutPrice) {
+                        $sellPrice = $undercutPrice;
+                        $undercutting = true;
+                    }
+                }
+                
+                // sell item
+                $totalSell = number_format($itemIdsToSellQuantity * $sellPrice);
+                console("<fg=green>>> [SELL] {$itemIdsToSellQuantity} x {$name} for ". number_format($sellPrice) ." ({$totalSell}) - Cheapest: {$cheapest} - Undercut: ". ($undercutting ? ('Yes at: '. $undercut) : 'No') ."</>");
+                $expectedProfit += $itemIdsToSellQuantity * $sellPrice;
+                $sale = $api->market()->sell($itemIdsToSell, $sellPrice);
+                unset($itemsNotSold[$itemId]);
+                
+                $salesCount++;
+                usleep($delayLoop2);
+                
+                // reset offer loop count
+                $loopsWithOffers = 0;
+                
+                // increment current offer
+                $offers++;
+                
+                // append id to our list
+                $listedItemIds = array_merge($listedItemIds, $itemIdsToSell);
+            }
+        }
+        
+        usleep($delayLoop1);
+    }
+} catch (\Exception $ex) {
+    sleepbot($ex);
+    goto botStart;
+}

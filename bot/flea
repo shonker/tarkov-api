@@ -1,0 +1,69 @@
+#!/usr/bin/env php
+<?php
+
+use TarkovAPI\Session\TarkovSession;
+use TarkovAPI\Tarkov;
+
+// Grab bot core
+require_once __DIR__ .'/bot_core.php';
+
+// download item list
+$itemfilename = __DIR__ .'/../data/items.json';
+if (!file_exists($itemfilename)) {
+    file_put_contents($itemfilename, file_get_contents('https://pastebin.com/raw/D4pSKvA6'));
+}
+$itemdata = file_get_contents($itemfilename);
+$itemdata = json_decode($itemdata);
+
+// init session
+TarkovSession::init();
+
+function printOfferResults($offers) {
+    if (empty($offers)) {
+        console("- There are no offers up for this item.");
+    }
+    
+    foreach ($offers as $i => $offer) {
+        $i        = ($i + 1);
+        $quantity = $offer->items[0]->upd->StackObjectsCount;
+        $cost     = number_format($offer->requirementsCost);
+        $total    = number_format($quantity * $offer->requirementsCost);
+        console("- {$i}: \t {$quantity} x {$cost} \t({$total}) \t\t");
+    }
+}
+
+// Setup API
+$api = new Tarkov();
+
+// item id
+$itemId = trim($argv[1]);
+
+if ($itemId === 'mine') {
+    $shoppinglist = require_once __DIR__ .'/bot_shopping_list.php';
+    
+    foreach ($shoppinglist as $shoppy) {
+        $name = $shoppy['name'];
+        $id   = $shoppy['id'];
+        
+        console("Checking top 5 market results for: {$name} \t");
+    
+        $results = $api->market()->search([ 'handbookId' => $id ], 0, 5);
+        printOfferResults($results->getData()->offers);
+    }
+}
+
+//
+// General flea market list
+//
+
+$item = $items->{$itemId} ?? null;
+
+if ($item === null) {
+    die("Cannot find item for id: {$itemId} -- make sure you copied it correctly.");
+}
+
+// check flea
+console("Checking top 25 market results for: {$item->name} \t");
+$results = $api->market()->search([ 'handbookId' => $itemId ], 0, 25);
+printOfferResults($results->getData()->offers);
+

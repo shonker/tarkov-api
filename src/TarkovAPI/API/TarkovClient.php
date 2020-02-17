@@ -27,6 +27,9 @@ class TarkovClient
 
     // client timeout
     const CLIENT_TIMEOUT = 5.0;
+    
+    // client verify
+    const CLIENT_VERIFY = false;
 
     // default headers for a request
     const CLIENT_HEADERS = [
@@ -61,7 +64,8 @@ class TarkovClient
         // init guzzle client
         $this->client = new Client([
             RequestOptions::TIMEOUT => self::CLIENT_TIMEOUT,
-            RequestOptions::HEADERS => self::CLIENT_HEADERS
+            RequestOptions::HEADERS => self::CLIENT_HEADERS,
+            RequestOptions::VERIFY  => self::CLIENT_VERIFY,
         ]);
     }
 
@@ -72,7 +76,7 @@ class TarkovClient
     {
         $this->requestCount++;
         
-        #$this->logger->log->info("Request: {$uri}");
+        # $this->logger->log->info("---> Request: {$uri}");
 
         // set our cookie if we have one
         $session = TarkovSession::retrieve('session');
