@@ -2,7 +2,6 @@
 vendor
 data
 *.log
+*.txt
 bot/login.php
 bot/bot_shopping_list.php
-*.txt
-bot/bot_settings.php

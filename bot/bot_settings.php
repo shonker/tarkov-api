@@ -29,7 +29,7 @@ $offerStuckDeadline = 30;
 $sellCompareIndex = 3;
 
 // How many times it should attempt to stack money, more = better stacking, but takes longer
-$roubleStackLoops = 4;
+$roubleStackLoops = 5;
 
 // max rouble stack before continuing (goes through 30 stacks then stops)
 $maxRoubleStacking = 30;

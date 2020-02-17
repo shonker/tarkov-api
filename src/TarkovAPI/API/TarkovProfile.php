@@ -41,7 +41,7 @@ class TarkovProfile extends TarkovClient
     /**
      * Stack items, eg 2 stacks of roubles.
      */
-    public function stackItem($fromId, $toId)
+    public function stackItem($fromId, $toId, $count = null)
     {
         $url = sprintf(
             self::ENDPOINT_PROFILE_MOVING,
@@ -58,6 +58,11 @@ class TarkovProfile extends TarkovClient
                 ]
             ]
         ];
+        
+        if ($count) {
+            $body['data'][0]['count'] = $count;
+            $body['data'][0]['Action'] = 'Transfer';
+        }
     
         return $this->requestGame(HTTP::POST, $url, [
             RequestOptions::JSON => $body,

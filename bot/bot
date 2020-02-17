@@ -197,11 +197,13 @@ try {
         $stackId = null;
         $stackAmount = 0;
         $stackCounter = 0;
+        
+        //console("Old Rouble Stacks: ". count($stacks));
 
         foreach ($stacks as $i => $stk) {
-            // skip stacks at 500k
+            // if we hit a 500 stack, we've hit limit
             if ($stk['amount'] >= 500000) {
-                continue;
+                break;
             }
 
             // if stack ID is null, set it
@@ -210,11 +212,22 @@ try {
                 $stackAmount = $stk['amount'];
                 continue;
             }
-
+            
+            $amountMerged = $stk['amount'];
+            $mergeAmount = null;
+            if ($stk['amount'] > 250000) {
+                $overAmount = ($stackAmount + $stk['amount']) % 500000;
+                $mergeAmount = $stk['amount'] - $overAmount;
+                $amountMerged = $mergeAmount;
+            }
+            
+    
             // merge
-            $api->profile()->stackItem($stackId, $stk['id']);
+            $api->profile()->stackItem($stk['id'], $stackId, $mergeAmount);
+            $stackAmount += $amountMerged;
             $stackCounter++;
-
+            
+            //console("Merged: {$amountMerged} from {$stk['id']} onto {$stackId} currently at: {$stackAmount}");
 
             // if the stack amount is now 500k, reset stack id
             if ($stackAmount >= 500000) {
@@ -225,6 +238,13 @@ try {
 
         // reload money
         $roubles = getCurrentRoublesCount();
+        console("New Rouble Stacks: ". count($roubles['stacks']));
+        
+        /*
+        foreach ($roubles['stacks'] as $r) {
+            console("Stack {$r['id']} = {$r['amount']}");
+        }
+        */
     }
     
     function sleepbot(\Exception $ex) {
@@ -376,7 +396,7 @@ try {
 
             // stack money
             console("MERGING ROUBLE STACKS");
-            foreach (range(0, $roubleStackLoops) as $stackLoop) {
+            foreach (range(1, $roubleStackLoops) as $stackLoop) {
                 mergeRoublesStacks();
             }
         }
