@@ -101,7 +101,7 @@ try {
         global $api, $player, $playerLastFetched;
         
         // if player info was fetched recently don't do anything
-        if ($playerLastFetched > time() - 10) {
+        if ($playerLastFetched > time() - 5) {
             return $player;
         }
     
@@ -185,43 +185,46 @@ try {
     }
     
     function mergeRoublesStacks() {
-        global $api, $roubles, $roubleStackMinimum, $maxRoubleStacking;
-        
-        // merge stacks
-        $previousStackId = null;
-        $stackCounter = 0;
+        global $api, $roubles;
 
-        // sort by high to low
-        usort($roubles['stacks'], function ($a, $b) {
+        $stacks = $roubles['stacks'];
+
+        // sort by low to high
+        usort($stacks, function ($a, $b) {
             return $a['amount'] <=> $b['amount'];
         });
 
-        foreach ($roubles['stacks'] as $roubleStack) {
-            if ($stackCounter > $maxRoubleStacking) {
-                break;
-            }
-            
-            // Skip stacks that are 500k, can't be merged
-            if ($roubleStack['amount'] == 500000) {
+        $stackId = null;
+        $stackAmount = 0;
+        $stackCounter = 0;
+
+        foreach ($stacks as $i => $stk) {
+            // skip stacks at 500k
+            if ($stk['amount'] >= 500000) {
                 continue;
             }
-            
-            // set the previous stack id and continue
-            if ($previousStackId === null) {
-                $previousStackId = $roubleStack['id'];
+
+            // if stack ID is null, set it
+            if ($stackId === null) {
+                $stackId     = $stk['id'];
+                $stackAmount = $stk['amount'];
                 continue;
             }
-        
-            // if we're below stack minimum, try merge
-            if ($roubleStack['amount'] < $roubleStackMinimum) {
-                // try merge with the previous
-                $api->profile()->stackItem($previousStackId, $roubleStack['id']);
-                $stackCounter++;
-                
-                // reset previous stack id
-                $previousStackId = null;
+
+            // merge
+            $api->profile()->stackItem($stackId, $stk['id']);
+            $stackCounter++;
+
+
+            // if the stack amount is now 500k, reset stack id
+            if ($stackAmount >= 500000) {
+                $stackId = null;
+                $stackAmount = 0;
             }
         }
+
+        // reload money
+        $roubles = getCurrentRoublesCount();
     }
     
     function sleepbot(\Exception $ex) {
@@ -366,6 +369,25 @@ console("<info>-----------------------------------------------------------------
 
 try {
     while(true) {
+        // get money from stash every so often
+        if ($iterationCount % $collectEveryIteration === 0) {
+            checkOffersCurrentlyActive();
+            getMoneyFromMarket();
+
+            // stack money
+            console("MERGING ROUBLE STACKS");
+            foreach (range(0, $roubleStackLoops) as $stackLoop) {
+                mergeRoublesStacks();
+            }
+        }
+
+        // check offers
+        $offers = getOfferCount();
+
+        // get player
+        $player = getMainPlayer();
+
+        // get money
         $roubles            = getCurrentRoublesCount();
         $roublesTotal       = $roubles['total'];
         $roublesStackId     = $roubles['stack_big_id'];
@@ -379,9 +401,6 @@ try {
         
         $inventorySize = count($player->Inventory->items);
         
-        // check offers
-        $offers = getOfferCount();
-        
         if ($offers > 0) {
             $loopsWithOffers++;
         }
@@ -391,23 +410,7 @@ try {
             console('The maximum number of loops has reached with max offers, good chance your shit isnt selling');
             die;
         }
-        
-        // Report iteration
-        $iterationCount++;
-        console("<fg=magenta>{$iterationCount}</> \t Roubles: <fg=magenta>". number_format($roubles['total']) ."</> | Spent: <fg=magenta>". number_format($maxRoubleSpentCurrent) ."</> | Est.Profit: <fg=magenta>{$currentEstProfit}</> | Offers: <fg=magenta>{$offers}/{$totalOffersPossible}</> | Inventory: <fg=magenta>{$inventorySize}</> | Buy: <fg=magenta>{$purchaseCount}</> / Sell: <fg=magenta>{$salesCount}</>");
-        
-        // get money from stash every so often
-        if ($iterationCount % $collectEveryIteration === 0) {
-            checkOffersCurrentlyActive();
-            getMoneyFromMarket();
-            
-            // stack money
-            console("MERGING ROUBLE STACKS");
-            foreach (range(0, $roubleStackLoops) as $stackLoop) {
-                mergeRoublesStacks();
-            }
-        }
-        
+
         // error check
         if ($errorCurrent > $errorMax) {
             console('Max error/rouble count reached, ending');
@@ -417,8 +420,14 @@ try {
         if ($iterationCount % $printOfferIterations === 0) {
             printOffers();
         }
-        
+
+        // Report iteration
+        $iterationCount++;
+        console("<fg=magenta>{$iterationCount}</> \t Roubles: <fg=magenta>". number_format($roubles['total']) ."</> | Spent: <fg=magenta>". number_format($maxRoubleSpentCurrent) ."</> | Est.Profit: <fg=magenta>{$currentEstProfit}</> | Offers: <fg=magenta>{$offers}/{$totalOffersPossible}</> | Inventory: <fg=magenta>{$inventorySize}</> | Buy: <fg=magenta>{$purchaseCount}</> / Sell: <fg=magenta>{$salesCount}</>");
+
+        //
         // BUY --- Scan market and buy shit!
+        //
         foreach ($items as $i => $item) {
             $name      = $item['name'];
             $itemId    = $item['id'];
@@ -503,11 +512,10 @@ try {
             usleep($delayLoop1);
             continue;
         }
-    
-        // get player
-        $player = getMainPlayer();
-        
+
+        //
         // SELL --- Scan our inventory and sell shit!
+        //
         foreach ($items as $i => $item) {
             $name      = $item['name'];
             $itemId    = $item['id'];
