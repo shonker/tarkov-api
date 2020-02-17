@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+echo "Starting web server .."
+
+cd web
+
+symfony server:start
