@@ -1,5 +1,8 @@
 # Tarkov API (PHP)
 
+> ⚠️ You will 100% get banned for using the bot code in the bot folder if you don't know what you're doing... Try understand the code first.
+
+
 There's no documentation with this, if BGS don't start banning I might improve it and provide documentation. To use this you must know how to include PHP packages into your library via composer, and then checkout bin/app for examples. A lot is hardcoded (like roubles and such) for my own use... Again if no bans are triggered I might generalise and improve this. For now it's for education purposes... Good luck.
 
 - Requirement: PHP 7.3+
