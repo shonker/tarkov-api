@@ -4,4 +4,3 @@ data
 *.log
 *.txt
 bot/login.php
-bot/bot_shopping_list.php
