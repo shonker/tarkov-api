@@ -75,24 +75,7 @@ $api->trading()->getTrader('trader_id');
 
 # Market bot
 
-- Make the file: `bot/bot_shopping_list.php`
-- Fill it with items like so:
-
-```php
-<?php
-
-return [
-  [
-     'name' => 'item',
-     'id' => 'id of item',
-     'buy' => 150, // maximum price to buy it
-     'sell' => 500, // mnimum sale price
-     'undercut' => 100, // minimum undercut price
-     'amount' => 3, // amount to stack before selling all
-  ]
-];
-```
-
+- Edit: `bot/bot_shopping_list.php` with shit you want
 - Rename `login_example.php` to `login.php` and fill it out
 - `composer install` at root all your shit
 - run bot in the bot folder: `php bot`
