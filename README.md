@@ -75,7 +75,7 @@ $api->trading()->getTrader('trader_id');
 
 # Market bot
 
-- Make the file: `bot_shopping_list.php`
+- Make the file: `bot/bot_shopping_list.php`
 - Fill it with items like so:
 
 ```php
@@ -95,5 +95,5 @@ return [
 
 - Rename `login_example.php` to `login.php` and fill it out
 - `composer install` at root all your shit
-- run bot: `php bot`
+- run bot in the bot folder: `php bot`
 - check market: `php flea <id>` or `php flea mine` for your shopping list
