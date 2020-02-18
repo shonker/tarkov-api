@@ -73,5 +73,27 @@ $api->trading()->getTrader('trader_id');
 ```
 
 
+# Market bot
 
+- Make the file: `bot_shopping_list.php`
+- Fill it with items like so:
 
+```php
+<?php
+
+return [
+  [
+     'name' => 'item',
+     'id' => 'id of item',
+     'buy' => 150, // maximum price to buy it
+     'sell' => 500, // mnimum sale price
+     'undercut' => 100, // minimum undercut price
+     'amount' => 3, // amount to stack before selling all
+  ]
+];
+```
+
+- Rename `login_example.php` to `login.php` and fill it out
+- `composer install` at root all your shit
+- run bot: `php bot`
+- check market: `php flea <id>` or `php flea mine` for your shopping list
