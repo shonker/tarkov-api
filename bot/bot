@@ -464,6 +464,10 @@ try {
             // search
             $listings = $api->market()->search([ 'handbookId' => $itemId ], 0, $itemsPerPage );
             
+            if (empty($listings->getData()->offers)) {
+                continue;
+            }
+            
             // get cheapest
             $cheapest = $listings->getData()->offers[0]->requirementsCost;
             //console("Cheapest {$name} = {$cheapest} / {$buyPrice}");
